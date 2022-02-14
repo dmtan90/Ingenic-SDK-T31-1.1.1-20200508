@@ -297,7 +297,8 @@
 #define CONFIG_DDR2_M14D5121632A
 #define CONFIG_DDR_TYPE_DDR2
 #endif
-#define DDR2_CHIP_DRIVER_OUT_STRENGTH 0
+//patch
+/*#define DDR2_CHIP_DRIVER_OUT_STRENGTH 0*/
 #define DDR2_CHIP_MR0_DLL_RST
 
 #define CONFIG_DDR_PHY_IMPEDANCE 40000
@@ -311,6 +312,8 @@
 /*#define CONFIG_DDR_PHY_ODT*/
 /*#define CONFIG_DDR_PHY_DQ_ODT*/
 /*#define CONFIG_DDR_PHY_DQS_ODT*/
+
+#define CONFIG_SYS_HUSH_PARSER      1
 
 /**
  * Boot arguments definitions.
@@ -337,7 +340,8 @@
 #ifdef CONFIG_SPL_MMC_SUPPORT
 	#define CONFIG_BOOTARGS BOOTARGS_COMMON " init=/linuxrc root=/dev/mmcblk0p2 rw rootdelay=1"
 #elif defined(CONFIG_SFC_NOR)
-	#define CONFIG_BOOTARGS BOOTARGS_COMMON " init=/linuxrc rootfstype=squashfs root=/dev/mtdblock2 rw mtdparts=jz_sfc:256k(boot),2560k(kernel),2048k(root),-(appfs)"
+	/*#define CONFIG_BOOTARGS BOOTARGS_COMMON " init=/linuxrc rootfstype=squashfs root=/dev/mtdblock2 rw mtdparts=jz_sfc:256k(boot),2560k(kernel),2048k(root),-(appfs)"*/
+    #define CONFIG_BOOTARGS BOOTARGS_COMMON " init=/linuxrc rootfstype=squashfs root=/dev/mtdblock2 rw mtdparts=jz_sfc:256k(boot),2048k(kernel),3392k(root),640k(driver),4736k(appfs),2048k(backupk),640k(backupd),2048k(backupa),256k(config),256k(para),-(flag)"
 #elif defined(CONFIG_SFC_NAND)
 	#define CONFIG_BOOTARGS BOOTARGS_COMMON " ip=off init=/linuxrc ubi.mtd=2 root=ubi0:rootfs ubi.mtd=3 rootfstype=ubifs rw"
 #endif
@@ -352,7 +356,54 @@
 #endif
 
 #ifdef CONFIG_SFC_NOR
-	#define CONFIG_BOOTCOMMAND "sf probe;sf read 0x80600000 0x40000 0x280000; bootm 0x80600000"
+	/*#define CONFIG_BOOTCOMMAND "sf probe;sf read 0x80600000 0x40000 0x280000; bootm 0x80600000"*/
+    #define CONFIG_BOOTCOMMAND " \
+       if printenv soctype; then \
+         echo \"Settings are already stored!\"; \
+       else \
+         jzsoc; saveenv; \
+       fi; \
+       if test \"${soctype}\" = \"T20L\" && test \"${flashtype}\" = \"EN25QH128A\" && i2c probe 0x40 ; then \
+         gpio set 38; gpio set 39; gpio set 47; gpio set 43; gpio clear 48; sleep 3; gpio clear 43; if printenv hwversion; then true; else setenv hwversion SENISC5; saveenv; fi; \
+         \
+       else if test \"${soctype}\" = \"T20X\" && test \"${flashtype}\" = \"GD25Q128\" && i2c probe 0x40 ; then \
+         gpio set 38; gpio set 39; gpio set 47; gpio set 43; gpio clear 48; if printenv hwversion; then true; else setenv hwversion DF3; saveenv; fi; \
+         \
+       else if test \"${soctype}\" = \"T20L\" && test \"${flashtype}\" = \"W25Q128\" ; then \
+         gpio clear 75; gpio clear 76; gpio set 60; if printenv hwversion; then true; else setenv hwversion SXJ02ZM; saveenv; fi; \
+         \
+       else if test \"${soctype}\" = \"T20X\" && test \"${flashtype}\" = \"EN25QH128A\" && i2c probe 0x40 ; then \
+         gpio set 38; gpio set 39; gpio set 47; gpio set 43; gpio clear 48; sleep 3; gpio clear 43; if printenv hwversion; then true; else setenv hwversion WYZEC2; saveenv; fi; \
+         \
+       else \
+         if printenv count; then \
+           if test \"${count}\" = \"1\"; then \
+             echo \"ping: ${count}\"; setenv count 2; saveenv; \
+             gpio set 43; gpio clear 48; sleep 3; gpio clear 43; \
+           else \
+             echo \"pong: ${count}\"; setenv count 1; saveenv; gpio set 43; gpio clear 48; \
+           fi; \
+         else \
+           echo \"pong: ${count}\"; setenv count 1; saveenv; \
+           gpio set 43; gpio clear 48; \
+         fi; \
+       fi; fi; fi; fi; \
+       echo Hardware found: ${hwversion}; \
+       \
+       \
+       if mmc rescan; then \
+         echo \"MMC Found\"; \
+         if ext4load mmc 0:1 0x80600000 uEnv.txt; then \
+           env import -t 0x80600000 ${filesize}; setenv bootargs \"${bootargs} hwversion=${hwversion}\"; boot; \
+         fi; \
+         else \
+           echo \"MMC not found...\"; \
+       fi; \
+       gpio clear 38; \
+       sf probe; \
+       sf read 0x80600000 0x40000 0x280000; \
+       bootm 0x80600000;"
+
 #endif /* CONFIG_SFC_NOR */
 
 #ifdef CONFIG_SFC_NAND
@@ -500,9 +551,16 @@
 #define CONFIG_CMDLINE_EDITING
 #define CONFIG_AUTO_COMPLETE
 /*#define CONFIG_CMD_I2C*/
+#define CONFIG_SOFT_I2C /* Always defined for software I2C support */
+#define CONFIG_SYS_I2C_SPEED 50000 /* default speed (in HZ) */
+#define CONFIG_SOFT_I2C_GPIO_SCL 13
+#define CONFIG_SOFT_I2C_GPIO_SDA 12
+#define CONFIG_CMD_I2C
+#define CONFIG_CMD_GPIO
 
 /************************ USB CONFIG ***************************/
-#undef CONFIG_CMD_USB
+/*#undef CONFIG_CMD_USB*/
+#define CONFIG_CMD_USB
 #ifdef CONFIG_CMD_USB
 #define CONFIG_USB_DWC2
 #define CONFIG_USB_DWC2_REG_ADDR 0x13500000
@@ -511,7 +569,9 @@
 /* #define CONFIG_USB_STORAGE */
 #endif
 
-/*#define CONFIG_AUTO_UPDATE			1*/
+#define CONFIG_CMD_EXT4
+#define CONFIG_CMD_JFFS2
+#define CONFIG_AUTO_UPDATE			1
 #ifdef CONFIG_AUTO_UPDATE
 	#define CONFIG_CMD_SDUPDATE		1
 #endif
@@ -616,7 +676,8 @@
 #define CONFIG_SPL_MAX_SIZE		(26 * 1024)
 #endif
 
-#undef CONFIG_SPL_LZOP
+/*#undef CONFIG_SPL_LZOP*/
+#define CONFIG_SPL_LZOP
 #ifdef CONFIG_SPL_LZOP
 	#define CONFIG_DECMP_BUFFER_ADRS        0x80200000
 #endif
